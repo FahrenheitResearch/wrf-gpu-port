@@ -230,21 +230,24 @@ def main():
 
     # Find the end of the USE module_domain ONLY block
     # We need to insert our own USE after it
+    # Continuation lines are indicated by & at the END of the previous line
     use_insert_line = None
     if True:
-        in_use_domain = False
+        found_use = False
         for i, line in enumerate(lines):
             if "USE module_domain" in line and "ONLY" in line:
-                in_use_domain = True
+                found_use = True
+                # Check if this line continues (ends with &)
+                if not line.rstrip().endswith("&"):
+                    # Single line USE, insert after it
+                    use_insert_line = i + 1
+                    break
                 continue
-            if in_use_domain:
-                stripped = line.strip()
-                # USE continuation lines start with , or &
-                if stripped.startswith(",") or stripped.startswith("&"):
-                    continue
-                else:
-                    # Found end of USE block
-                    use_insert_line = i
+            if found_use:
+                # We're in continuation lines of the USE statement
+                if not line.rstrip().endswith("&"):
+                    # This is the last continuation line
+                    use_insert_line = i + 1
                     break
 
     # Build new file content
