@@ -226,6 +226,7 @@ def patch_scalar_pd_horz(lines):
                 patcher.add_before(xflux_j_loop, [acc_kernels_present(pd_present, indent)], "6th-order x-flux START")
 
     # --- 5th-order y-flux ---
+    enddo5y = 0
     idx5y = find_line(lines, 'j_loop_y_flux_5 : DO j = j_start, j_end+1', sub_start, sub_end)
     if idx5y >= 0 and not has_acc_nearby(lines, idx5y):
         enddo5y = find_enddo(lines, idx5y)
@@ -260,6 +261,7 @@ def patch_scalar_pd_horz(lines):
         horz4_end = horz3_start if horz3_start >= 0 else sub_end
 
         # 4th-order y-flux: named j_loop_y_flux_4 or just DO j
+        enddo4y = 0
         idx4y = find_line(lines, 'j_loop_y_flux_4', horz4_start, horz4_end)
         if idx4y < 0:
             # Search for DO j = j_start, j_end+1 after horz4_start
@@ -292,6 +294,7 @@ def patch_scalar_pd_horz(lines):
         horz2_start = find_line(lines, "horz_order == 2 ) THEN", horz3_start + 1, sub_end)
         horz3_end = horz2_start if horz2_start >= 0 else sub_end
 
+        enddo3y = 0
         idx3y = find_line(lines, 'j_loop_y_flux_3', horz3_start, horz3_end)
         if idx3y < 0:
             idx3y = find_line_re(lines, r'DO j\s*=\s*j_start\s*,\s*j_end\s*\+\s*1', horz3_start, horz3_end)
@@ -327,6 +330,7 @@ def patch_scalar_pd_horz(lines):
             horz2_end_pd = sub_end
 
         # y-flux: "DO j = j_start, j_end+1" with fqy writes
+        enddo2y = 0
         idx2y = find_line_re(lines, r'DO j\s*=\s*j_start\s*,\s*j_end\s*\+\s*1', horz2_start_pd, horz2_end_pd)
         if idx2y >= 0 and not has_acc_nearby(lines, idx2y):
             enddo2y = find_enddo(lines, idx2y)
