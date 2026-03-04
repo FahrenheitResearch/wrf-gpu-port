@@ -212,10 +212,42 @@ def main():
         print("ERROR: could not find RETURN statement", file=sys.stderr)
         sys.exit(1)
 
+    # ── Build gpu_init one-time call ─────────────────────────────────
+    # gpu_init_domain_data copies all grid% arrays to GPU.
+    # It must run once before any !$acc present() directives.
+    # We use a SAVE variable to ensure it only runs on the first call.
+    gpu_init_block = (
+        "   ! --- GPU init: copy grid arrays to device (one-time) ---\n"
+        "   IF (.NOT. gpu_data_initialized) THEN\n"
+        "     CALL gpu_init_domain_data(grid)\n"
+        "     gpu_data_initialized = .TRUE.\n"
+        "   END IF"
+    )
+
+    # Find the declaration block to add the SAVE variable
+    # Look for the last LOGICAL declaration or a good spot before decl_end
+    save_decl = "   LOGICAL, SAVE :: gpu_data_initialized = .FALSE."
+
     # Build new file content
     new_lines = []
+    save_inserted = False
     for i, line in enumerate(lines):
+        # Insert SAVE declaration near start of declarations
+        if not save_inserted and i > 0 and i < decl_end:
+            stripped = line.strip().lower()
+            # Insert after first LOGICAL declaration we find
+            if stripped.startswith("logical"):
+                new_lines.append(line)
+                new_lines.append(save_decl)
+                save_inserted = True
+                continue
         if i == insert_open:
+            # If we haven't inserted the SAVE decl yet, do it before exec stmts
+            if not save_inserted:
+                new_lines.append(save_decl)
+                save_inserted = True
+            new_lines.append("")
+            new_lines.append(gpu_init_block)
             new_lines.append("")
             new_lines.append(enter_block)
             new_lines.append("")
@@ -227,6 +259,7 @@ def main():
 
     SOLVE_EM.write_text("\n".join(new_lines))
     print(f"\nPatched {SOLVE_EM}")
+    print(f"  - Inserted CALL gpu_init_domain_data(grid) one-time init")
     print(f"  - Inserted !$acc enter data create({len(all_locals)} vars) at line ~{insert_open + 1}")
     print(f"  - Inserted !$acc exit data delete before RETURN at line ~{return_line + 1}")
 
