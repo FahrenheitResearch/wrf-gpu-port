@@ -194,6 +194,7 @@ def patch_scalar_pd_horz(lines):
     # --- 6th-order y-flux ---
     # Look for "j_loop_y_flux_6 : DO j = j_start, j_end+1"
     # This loop writes fqy(i,k,j) and fqyl(i,k,j) for each j
+    enddo = 0
     idx = find_line(lines, 'j_loop_y_flux_6 : DO j = j_start, j_end+1', sub_start, sub_end)
     if idx >= 0 and not has_acc_nearby(lines, idx):
         enddo = find_enddo(lines, idx)
@@ -205,7 +206,7 @@ def patch_scalar_pd_horz(lines):
     # --- 6th-order x-flux ---
     # After the y-flux loop, there's "DO j = j_start, j_end" containing x-flux
     # Find it by looking for the x-flux body marker after the y-flux enddo
-    search_from = enddo + 1 if (idx >= 0 and enddo > 0) else sub_start
+    search_from = (enddo + 1) if (idx >= 0 and enddo > 0) else sub_start
     # The x-flux section starts with recalculation of i_start, i_end, then "DO j = j_start, j_end"
     # body contains "fqx( i,k,j ) = vel*flux6("
     xflux_body = find_line(lines, 'vel*flux6( field(i-3,k,j)', search_from, sub_end)

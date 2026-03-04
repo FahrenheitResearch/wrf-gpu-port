@@ -8,7 +8,7 @@
 # Disables module_bc ACC by default (present() errors)
 set -e
 
-WRF="${WRF_DIR:-/home/$USER/WRF_BUILD_GPU}"
+WRF="${1:-${WRF_DIR:-/home/$USER/WRF_BUILD_GPU}}"
 PATCHES="$(cd "$(dirname "$0")" && pwd)"
 PYTHON="${PYTHON:-python3}"
 

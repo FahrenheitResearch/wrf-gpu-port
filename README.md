@@ -61,7 +61,7 @@ apt-get install -y curl build-essential m4 csh file libxml2-dev
 #    Ensure nvfortran, nvc, nvc++ are on PATH
 
 # 2. Build NetCDF/HDF5 with nvfortran
-./utils/build_libraries.sh
+./build_libraries.sh
 
 # 3. Download and configure WRF 4.7.1
 cd /path/to/WRF-4.7.1
@@ -104,7 +104,7 @@ WRF's I/O requires NetCDF4 and HDF5. These must be compiled with the same compil
 
 ```bash
 # Use the provided helper script
-./utils/build_libraries.sh
+./build_libraries.sh
 
 # Or build manually:
 # - HDF5 1.14.x: FC=nvfortran CC=nvc ./configure --enable-fortran --prefix=...
