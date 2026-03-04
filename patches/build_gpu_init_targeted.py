@@ -48,8 +48,11 @@ DYNAMICS_CORE = [
     # Vertical coordinate coefficients
     "c1h", "c2h", "c1f", "c2f", "c3h", "c4h", "c3f", "c4f",
     "dn", "dnw", "rdn", "rdnw", "fnm", "fnp",
-    # Coupled velocity
+    # Coupled velocity (time-mean, used by advection)
     "ru_m", "rv_m", "ww_m",
+    # Coupled velocity (current RK step, computed by rk_step_prep)
+    # These are OUTPUT of rk_step_prep and INPUT to coriolis/curvature/advection
+    "ru", "rv", "rw", "ww",
     # Tendencies
     "ru_tend", "rv_tend",
     "h_diabatic", "mut",
@@ -59,6 +62,12 @@ DYNAMICS_CORE = [
     "u_save", "v_save", "t_save",
     # Additional coupled velocity
     "muu", "muv",
+    # Base state profiles (used by coriolis/curvature in big_step)
+    "u_base", "v_base", "t_base", "qv_base", "z_base",
+    # Latitude / frame velocity (used by coriolis/curvature)
+    "clat", "u_frame", "v_frame",
+    # Initial temperature (used by rk_tendency)
+    "t_init",
 ]
 
 # Physics tendency arrays (used by calculate_phy_tend in module_em)
