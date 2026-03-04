@@ -114,10 +114,7 @@ echo "============================================"
 echo "STEP 4: Apply physics patches (SAFE ONLY)"
 echo "============================================"
 
-echo "Patching sfclayrev..."
-$PYTHON $PATCHES/patch_sfclay_gpu.py
-echo "  done"
-
+echo "SKIPPING patch_sfclay_gpu.py (present() errors — physics callers don't set up data regions)"
 echo "SKIPPING patch_wsm6_gpu.py (caused NaN — modified code logic)"
 echo "SKIPPING patch_ysu_gpu.py (caused GPU hang)"
 
