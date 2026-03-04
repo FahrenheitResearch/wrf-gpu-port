@@ -228,10 +228,35 @@ def main():
     # Look for the last LOGICAL declaration or a good spot before decl_end
     save_decl = "   LOGICAL, SAVE :: gpu_data_initialized = .FALSE."
 
+    # Find the end of the USE module_domain ONLY block
+    # We need to insert our own USE after it
+    use_insert_line = None
+    if True:
+        in_use_domain = False
+        for i, line in enumerate(lines):
+            if "USE module_domain" in line and "ONLY" in line:
+                in_use_domain = True
+                continue
+            if in_use_domain:
+                stripped = line.strip()
+                # USE continuation lines start with , or &
+                if stripped.startswith(",") or stripped.startswith("&"):
+                    continue
+                else:
+                    # Found end of USE block
+                    use_insert_line = i
+                    break
+
     # Build new file content
     new_lines = []
     save_inserted = False
+    use_inserted = False
     for i, line in enumerate(lines):
+        # Insert USE for gpu_init_domain_data after the USE module_domain block
+        if not use_inserted and use_insert_line is not None and i == use_insert_line:
+            new_lines.append("   USE module_domain, ONLY : gpu_init_domain_data")
+            use_inserted = True
+
         # Insert SAVE declaration near start of declarations
         if not save_inserted and i > 0 and i < decl_end:
             stripped = line.strip().lower()
