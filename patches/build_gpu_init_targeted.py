@@ -50,7 +50,6 @@ DYNAMICS_CORE = [
     "dn", "dnw", "rdn", "rdnw", "fnm", "fnp",
     # Coupled velocity
     "ru_m", "rv_m", "ww_m",
-    "ru_s", "rv_s", "ww_s",
     # Tendencies
     "ru_tend", "rv_tend",
     "h_diabatic", "mut",
@@ -73,8 +72,8 @@ PHYSICS_TENDENCIES = [
     "rqvshten", "rqcshten", "rqishten", "rqrshten", "rqsshten",
     # FDDA nudging
     "rundgdten", "rvndgdten", "rthndgdten", "rqvndgdten",
-    # IAU tendencies
-    "ruiaten", "rviaten", "rthiaten",
+    # IAU tendencies (only if IAU enabled — may not exist)
+    # "ruiaten", "rviaten", "rthiaten",
     # Other physics
     "rthften", "rqvften",
 ]
