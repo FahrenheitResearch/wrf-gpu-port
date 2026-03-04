@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """
-patch_solve_em_gpu.py — Add !$acc data create(...) region to solve_em
+patch_solve_em_gpu.py — Add !$acc enter/exit data for solve_em local arrays
 
-Parses local 3D and 2D array declarations in solve_em and wraps the
-executable body with an OpenACC structured data region so that stack-
-allocated locals are allocated on-GPU before any dynamics kernel
-that references them with !$acc parallel loop present(...).
+Parses local 3D and 2D array declarations in solve_em and adds UNSTRUCTURED
+data management (!$acc enter data create / !$acc exit data delete) so that
+local arrays are available on GPU for dynamics kernels.
 
-Idempotent: skips patching if '!$acc data create' already present.
+IMPORTANT: Uses unstructured data directives (enter data / exit data) instead
+of structured (data create / end data) because structured regions cause NVHPC
+to try auto-offloading ALL code inside the region, including physics
+subroutine calls that are not GPU-ready (e.g., Thompson microphysics).
+Unstructured directives only manage memory — they don't affect offloading.
+
+Idempotent: skips patching if '!$acc enter data create' already present.
 """
 
 import re
@@ -75,8 +80,8 @@ def main():
     lines = text.split("\n")
 
     # ── Idempotency check ──────────────────────────────────────────
-    if "!$acc data create" in text:
-        print("solve_em.f90 already contains '!$acc data create' — skipping.")
+    if "!$acc enter data create" in text:
+        print("solve_em.f90 already contains '!$acc enter data create' — skipping.")
         return
 
     # ── Pass 1: collect local array names ──────────────────────────
@@ -155,8 +160,10 @@ def main():
     print(f"Found {len(local_2d)} local 2D arrays: {', '.join(local_2d)}")
     print(f"Found {len(local_4d)} local 4D arrays: {', '.join(local_4d)}")
 
-    # ── Build the !$acc data create(...) directive ─────────────────
+    # ── Build the !$acc enter data create(...) directive ────────────
     # All locals go in create() — they are uninitialized scratch space.
+    # Using UNSTRUCTURED data management (enter data / exit data) so that
+    # NVHPC doesn't try to auto-offload physics code inside the region.
     all_locals = local_3d + local_2d + local_4d
     if not all_locals:
         print("WARNING: no local arrays found — nothing to patch.")
@@ -164,21 +171,34 @@ def main():
 
     # Format: split across continuation lines, ~6 vars per line
     chunk_size = 6
-    acc_lines = []
-    acc_lines.append("!$acc data create( &")
+
+    # Build enter data create block
+    enter_lines = []
+    enter_lines.append("!$acc enter data create( &")
     for start in range(0, len(all_locals), chunk_size):
         chunk = all_locals[start : start + chunk_size]
         names = ", ".join(chunk)
         if start + chunk_size < len(all_locals):
-            acc_lines.append(f"!$acc   {names}, &")
+            enter_lines.append(f"!$acc   {names}, &")
         else:
-            acc_lines.append(f"!$acc   {names} )")
+            enter_lines.append(f"!$acc   {names} )")
     # Indent to match surrounding code (3 spaces)
-    acc_block = "\n".join("   " + l for l in acc_lines)
+    enter_block = "\n".join("   " + l for l in enter_lines)
+
+    # Build exit data delete block
+    exit_lines = []
+    exit_lines.append("!$acc exit data delete( &")
+    for start in range(0, len(all_locals), chunk_size):
+        chunk = all_locals[start : start + chunk_size]
+        names = ", ".join(chunk)
+        if start + chunk_size < len(all_locals):
+            exit_lines.append(f"!$acc   {names}, &")
+        else:
+            exit_lines.append(f"!$acc   {names} )")
+    exit_block = "\n".join("   " + l for l in exit_lines)
 
     # ── Pass 2: insert the directives ──────────────────────────────
-    # Insert !$acc data create(...) right before the first executable stmt
-    # (line decl_end, which is 'feedback_is_ready = .false.')
+    # Insert !$acc enter data create(...) right before the first executable stmt
     insert_open = decl_end
 
     # Find the RETURN at end of subroutine
@@ -192,26 +212,23 @@ def main():
         print("ERROR: could not find RETURN statement", file=sys.stderr)
         sys.exit(1)
 
-    # Insert !$acc end data before RETURN
-    end_directive = "   !$acc end data"
-
     # Build new file content
     new_lines = []
     for i, line in enumerate(lines):
         if i == insert_open:
             new_lines.append("")
-            new_lines.append(acc_block)
+            new_lines.append(enter_block)
             new_lines.append("")
         if i == return_line:
             new_lines.append("")
-            new_lines.append(end_directive)
+            new_lines.append(exit_block)
             new_lines.append("")
         new_lines.append(line)
 
     SOLVE_EM.write_text("\n".join(new_lines))
     print(f"\nPatched {SOLVE_EM}")
-    print(f"  - Inserted !$acc data create({len(all_locals)} vars) at line ~{insert_open + 1}")
-    print(f"  - Inserted !$acc end data before RETURN at line ~{return_line + 1}")
+    print(f"  - Inserted !$acc enter data create({len(all_locals)} vars) at line ~{insert_open + 1}")
+    print(f"  - Inserted !$acc exit data delete before RETURN at line ~{return_line + 1}")
 
 
 if __name__ == "__main__":
