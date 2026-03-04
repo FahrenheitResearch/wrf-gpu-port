@@ -176,12 +176,21 @@ echo "  done"
 
 echo ""
 echo "============================================"
+echo "STEP 5b: Fix advection PD limiter race condition"
+echo "============================================"
+echo "Replacing racy single-pass PD limiter with race-free two-pass algorithm..."
+$PYTHON $PATCHES/fix_advect_pd_race.py
+echo "  done"
+echo "Adding private() clauses to advection parallel loops..."
+$PYTHON $PATCHES/fix_advect_private.py
+echo "  done"
+
+echo ""
+echo "============================================"
 echo "STEP 6: Disable known-broken ACC modules"
 echo "============================================"
 
-echo "Disabling advect ACC (causes instability at ~5 min)..."
-$PYTHON $PATCHES/disable_one_acc.py module_advect_em.f90
-echo "  done"
+echo "NOTE: Advection ACC is now ENABLED (PD race condition fixed)"
 
 echo "Disabling module_bc ACC (present() errors)..."
 $PYTHON $PATCHES/disable_bc_acc.py
