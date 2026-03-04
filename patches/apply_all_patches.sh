@@ -9,6 +9,7 @@
 set -e
 
 WRF="${1:-${WRF_DIR:-/home/$USER/WRF_BUILD_GPU}}"
+export WRF_DIR="$WRF"
 PATCHES="$(cd "$(dirname "$0")" && pwd)"
 PYTHON="${PYTHON:-python3}"
 
@@ -36,6 +37,7 @@ for f in $WRF/dyn_em/module_small_step_em.f90 \
          $WRF/dyn_em/module_diffusion_em.f90 \
          $WRF/dyn_em/solve_em.f90 \
          $WRF/dyn_em/module_em.f90 \
+         $WRF/dyn_em/start_em.f90 \
          $WRF/frame/module_domain.f90 \
          $WRF/share/module_bc.f90; do
     if [ ! -f "$f" ]; then
@@ -101,6 +103,10 @@ echo "  done"
 
 echo "Patching solve_em data regions..."
 $PYTHON $PATCHES/patch_solve_em_gpu.py
+echo "  done"
+
+echo "Patching start_em (CALL gpu_init_domain_data)..."
+$PYTHON $PATCHES/patch_start_em_gpu.py
 echo "  done"
 
 echo ""
