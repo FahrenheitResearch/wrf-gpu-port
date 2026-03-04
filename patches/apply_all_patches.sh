@@ -17,6 +17,17 @@ echo "PATCHES: $PATCHES"
 echo ""
 
 echo "============================================"
+echo "PRE-CHECK: Detect already-patched .f90 files"
+echo "============================================"
+ACC_COUNT=$(grep -rl '!\$acc' "$WRF"/dyn_em/*.f90 "$WRF"/frame/module_domain.f90 "$WRF"/share/module_bc.f90 2>/dev/null | wc -l || true)
+if [ "$ACC_COUNT" -gt 0 ]; then
+    echo "WARNING: $ACC_COUNT .f90 file(s) already contain !\$acc directives."
+    echo "  Patches are designed to run on clean (unpatched) .f90 files."
+    echo "  If you see errors, regenerate .f90 files with './compile em_real' first."
+    echo ""
+fi
+
+echo "============================================"
 echo "STEP 1: Verify .f90 files exist"
 echo "============================================"
 for f in $WRF/dyn_em/module_small_step_em.f90 \
@@ -37,8 +48,11 @@ echo "All .f90 files present."
 
 echo ""
 echo "============================================"
-echo "STEP 2: Apply GPU init patch (1404 grid% arrays)"
+echo "STEP 2: Create + populate GPU init subroutines"
 echo "============================================"
+echo "Creating gpu_init_domain_data stub..."
+$PYTHON $PATCHES/create_gpu_init.py "$WRF"
+echo "Populating gpu_init with grid% copyin directives..."
 $PYTHON $PATCHES/build_gpu_init_from_struct.py
 $PYTHON $PATCHES/patch_gpu_init_les.py
 echo "gpu_init patched"

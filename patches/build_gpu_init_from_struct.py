@@ -9,10 +9,16 @@ Only adds ARRAY fields (not scalars/strings/derived types).
 """
 import re
 import os
+import sys
 
-WRF = "/home/drew/WRF_BUILD_GPU"
-DOMAIN_FILE = os.path.join(WRF, "frame/module_domain.f90")
-STRUCT_FILE = os.path.join(WRF, "inc/state_struct.inc")
+WRF_DIR = os.environ.get("WRF_DIR", sys.argv[1] if len(sys.argv) > 1 else None)
+if not WRF_DIR:
+    print("ERROR: Set WRF_DIR environment variable or pass WRF directory as argument")
+    sys.exit(1)
+
+WRF = WRF_DIR
+DOMAIN_FILE = os.path.join(WRF, "frame", "module_domain.f90")
+STRUCT_FILE = os.path.join(WRF, "inc", "state_struct.inc")
 
 # Files where grid% fields are used and may need GPU presence
 SCAN_FILES = [

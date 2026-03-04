@@ -35,7 +35,11 @@ with explicit `present` clauses for safety.
 import sys
 import os
 
-WRF = os.environ.get("WRF_DIR", "/home/drew/WRF_BUILD_GPU")
+WRF_DIR = os.environ.get("WRF_DIR", sys.argv[1] if len(sys.argv) > 1 else None)
+if not WRF_DIR:
+    print("ERROR: Set WRF_DIR environment variable or pass WRF directory as argument")
+    sys.exit(1)
+WRF = WRF_DIR
 
 FILES = {
     "big_step": f"{WRF}/dyn_em/module_big_step_utilities_em.f90",

@@ -48,6 +48,12 @@ Adjust the `-gpu=ccXX` flag in `configure.wrf` for your target architecture.
 - **Python 3.x** (for applying patch scripts)
 - **WPS** (Weather Preprocessing System, for generating initial/boundary conditions)
 
+### System Prerequisites (Ubuntu/Debian)
+
+```bash
+apt-get install -y curl build-essential m4 csh file libxml2-dev
+```
+
 ## Quick Start
 
 ```bash
@@ -59,7 +65,8 @@ Adjust the `-gpu=ccXX` flag in `configure.wrf` for your target architecture.
 
 # 3. Download and configure WRF 4.7.1
 cd /path/to/WRF-4.7.1
-./configure  # Select NVHPC (dmpar) option
+export NETCDF_classic=1
+./configure  # Grep for "PGI" in the menu, pick the dmpar variant
 # Edit configure.wrf: add -acc -gpu=cc120,fastmath to FCFLAGS and LDFLAGS
 
 # 4. Initial compile
@@ -116,9 +123,11 @@ export HDF5=/path/to/hdf5
 
 ```bash
 cd WRF-4.7.1
+export NETCDF_classic=1
 ./configure
-# Select the NVHPC dmpar option
 ```
+
+When the configuration menu appears, look for the **PGI/NVHPC** entries (grep for "PGI" in the list) and select the **dmpar** variant.
 
 Edit `configure.wrf` to add GPU flags:
 
@@ -132,7 +141,18 @@ Edit `configure.wrf` to add GPU flags:
 # Set compilers:
 DM_FC = nvfortran
 SFC   = nvfortran
+
+# Ensure FCBASEOPTS includes $(FORMAT_FREE) (critical for ESMF .f files):
+FCBASEOPTS = -w $(FCDEBUG) $(FORMAT_FREE) $(BYTESWAPIO) -Mrecursive $(OMP)
 ```
+
+Add **only** `-DGPU_OPENACC` to `ARCH_LOCAL`:
+
+```makefile
+ARCH_LOCAL = -DGPU_OPENACC
+```
+
+> **WARNING:** Do **not** add `-D_ACCEL` to `ARCH_LOCAL`. The `_ACCEL` flag enables broken legacy OpenACC 1.0 directives baked into WRF's WSM3/WSM5 microphysics code, which will cause compile or runtime failures. Use only `-DGPU_OPENACC`.
 
 Replace `cc120` with your GPU's compute capability (e.g., `cc89` for RTX 4090, `cc80` for A100).
 
@@ -176,7 +196,8 @@ cd /path/to/WRF-4.7.1
 ### Environment Setup
 
 ```bash
-# CRITICAL: Disable OpenMP (conflicts with OpenACC GPU execution)
+# CRITICAL: You MUST set this. OpenMP threading conflicts with OpenACC GPU
+# execution and will cause silent hangs or incorrect results if not disabled.
 export OMP_NUM_THREADS=1
 ```
 
@@ -243,19 +264,23 @@ Data transfer between CPU physics and GPU dynamics happens via OpenACC `!$acc up
 
 ## Known Issues
 
-1. **`module_advect_em` GPU causes instability** -- The advection module has 143 ACC directives applied but produces numerical instability after approximately 5 minutes of simulated time. This module is disabled by default (runs on CPU). Debugging is ongoing; the issue is likely related to array indexing or race conditions in the Runge-Kutta advection loop.
+1. **GPU acceleration scope** -- GPU kernels currently cover specific dynamics modules: `small_step`, `big_step`, `diffusion`, and `module_em`. Advection and all physics parameterizations remain on CPU. The observed 3-4x speedup over gfortran comes primarily from NVHPC compiler optimizations (vectorization, instruction scheduling) rather than GPU offload. Full GPU speedup will require porting advection and physics.
 
-2. **`OMP_NUM_THREADS` must be 1** -- OpenMP threading conflicts with OpenACC GPU execution. Always set `OMP_NUM_THREADS=1` before running.
+2. **`module_advect_em` GPU causes instability** -- The advection module has 143 ACC directives applied but produces numerical instability after approximately 5 minutes of simulated time. This module is disabled by default (runs on CPU). Debugging is ongoing; the issue is likely related to array indexing or race conditions in the Runge-Kutta advection loop.
 
-3. **`module_bc` ACC disabled** -- Boundary condition module patches produce `present()` data clause errors at runtime. Boundary conditions run on CPU.
+3. **`OMP_NUM_THREADS` must be 1** -- OpenMP threading conflicts with OpenACC GPU execution. Always set `OMP_NUM_THREADS=1` before running.
 
-4. **VRAM limits grid size** -- On a 32 GB GPU, the practical limit is approximately 400x400 horizontal grid points at 250m resolution with 50 vertical levels. Larger grids require more VRAM or domain decomposition across multiple GPUs (not yet tested).
+4. **`module_bc` ACC disabled** -- Boundary condition module patches produce `present()` data clause errors at runtime. Boundary conditions run on CPU.
 
-5. **Physics on CPU** -- All physics parameterizations remain on CPU. This means data must be transferred between GPU and CPU each time step, which limits the achievable speedup. Porting physics (especially WSM6 microphysics) is a future goal.
+5. **VRAM limits grid size** -- On a 32 GB GPU, the practical limit is approximately 400x400 horizontal grid points at 250m resolution with 50 vertical levels. Larger grids require more VRAM or domain decomposition across multiple GPUs (not yet tested).
 
-6. **Single-GPU only** -- Multi-GPU domain decomposition via MPI has not been tested. The port currently targets single-GPU execution with `mpirun -np 1`.
+6. **Physics on CPU** -- All physics parameterizations remain on CPU. This means data must be transferred between GPU and CPU each time step, which limits the achievable speedup. Porting physics (especially WSM6 microphysics) is a future goal.
 
-7. **Build sensitivity** -- Touching certain framework files (especially `module_domain.F`) can trigger cascading recompiles that fail. Use the `.f90`-level editing workaround described in Build Instructions.
+7. **Single-GPU only** -- Multi-GPU domain decomposition via MPI has not been tested. The port currently targets single-GPU execution with `mpirun -np 1`.
+
+8. **Build sensitivity** -- Touching certain framework files (especially `module_domain.F`) can trigger cascading recompiles that fail. Use the `.f90`-level editing workaround described in Build Instructions.
+
+9. **Do not use `-D_ACCEL`** -- WRF's WSM3/WSM5 contain ancient OpenACC 1.0 directives guarded by `_ACCEL` that are incompatible with modern NVHPC. Use only `-DGPU_OPENACC` in `ARCH_LOCAL`.
 
 ## Repository Structure
 

@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """Fix duplicate !$acc parallel loop directives in module_physics_addtendc.f90"""
+import os, sys
 
-path = "/home/drew/WRF_BUILD_GPU/phys/module_physics_addtendc.f90"
+WRF_DIR = os.environ.get("WRF_DIR", sys.argv[1] if len(sys.argv) > 1 else None)
+if not WRF_DIR:
+    print("ERROR: Set WRF_DIR environment variable or pass WRF directory as argument")
+    sys.exit(1)
+
+path = os.path.join(WRF_DIR, "phys", "module_physics_addtendc.f90")
 with open(path) as f:
     lines = f.readlines()
 

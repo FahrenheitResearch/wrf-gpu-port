@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Re-enable ACC directives (!!$acc -> !$acc) in the 4 dynamics files."""
-import os
-os.chdir("/home/drew/WRF_BUILD_GPU/dyn_em")
+import os, sys
+WRF_DIR = os.environ.get("WRF_DIR", sys.argv[1] if len(sys.argv) > 1 else None)
+if not WRF_DIR:
+    print("ERROR: Set WRF_DIR environment variable or pass WRF directory as argument")
+    sys.exit(1)
+os.chdir(os.path.join(WRF_DIR, "dyn_em"))
 for fname in ["module_advect_em.f90", "module_big_step_utilities_em.f90",
               "module_diffusion_em.f90", "module_em.f90"]:
     with open(fname) as f:

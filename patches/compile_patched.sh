@@ -43,7 +43,7 @@ echo "========================================================================"
 # ---------------------------------------------------------------------------
 NVHPC_ROOT="/opt/nvidia/hpc_sdk/Linux_x86_64/26.1"
 export PATH="${NVHPC_ROOT}/compilers/bin:${NVHPC_ROOT}/comm_libs/mpi/bin:${PATH}"
-export LD_LIBRARY_PATH="${NVHPC_ROOT}/compilers/lib:${NVHPC_ROOT}/comm_libs/mpi/lib:${NVHPC_ROOT}/cuda/13.1/lib64:/home/${USER}/libs/lib:${WRF_DIR}/LIBRARIES/netcdf-install/lib:${WRF_DIR}/LIBRARIES/hdf5-install/lib:${LD_LIBRARY_PATH:-}"
+export LD_LIBRARY_PATH="${NVHPC_ROOT}/compilers/lib:${NVHPC_ROOT}/comm_libs/mpi/lib:${NVHPC_ROOT}/cuda/13.1/lib64:/home/${USER}/libs/lib:${NETCDF}/lib:${HDF5}/lib:${LD_LIBRARY_PATH:-}"
 
 # Confirm nvfortran is reachable
 if ! command -v nvfortran &>/dev/null; then
@@ -66,7 +66,7 @@ FFLAGS="-O3 -fast -acc -gpu=${GPU_CC},fastmath -Mfree -Mrecursive -byteswapio -r
 FFLAGS_CPU="-O3 -fast -Mfree -Mrecursive -byteswapio -r4 -i4 -mp"
 
 # Include paths — mirrors the paths used during the original WRF configure build.
-# -DGPU_OPENACC and -D_ACCEL guard any conditional GPU code in WRF headers.
+# -DGPU_OPENACC guards conditional GPU code in WRF headers.
 INCS=(
     "-I${WRF_DIR}/frame"
     "-I${WRF_DIR}/inc"
@@ -80,7 +80,6 @@ INCS=(
     "-I${WRF_DIR}/dyn_em"
     "-I${WRF_DIR}/phys/physics_mmm"
     "-DGPU_OPENACC"
-    "-D_ACCEL"
 )
 INCS_STR="${INCS[*]}"
 
@@ -195,7 +194,7 @@ compile_file \
 # Scalar/momentum advection.  ACC DIRECTIVES DISABLED (!!$acc) — dynamics
 # reverted after mismatching kernel issues; compiles with -acc but no GPU kernels.
 compile_file \
-    "dyn_em/module_advect_em.f90  [ACC: directives disabled via !!$acc]" \
+    'dyn_em/module_advect_em.f90  [ACC: directives disabled via !!$acc]' \
     "${WRF_DIR}/dyn_em" \
     "module_advect_em.f90" \
     "module_advect_em.o" \
@@ -240,7 +239,7 @@ compile_file \
 # share/module_bc.f90
 # Boundary conditions.  ACC DIRECTIVES DISABLED (!!$acc) — CPU only by design.
 compile_file \
-    "share/module_bc.f90  [ACC: directives disabled via !!$acc]" \
+    'share/module_bc.f90  [ACC: directives disabled via !!$acc]' \
     "${WRF_DIR}/share" \
     "module_bc.f90" \
     "module_bc.o" \
@@ -336,7 +335,7 @@ for f in "${REQUIRED_LINK[@]}"; do
     fi
 done
 
-nvfortran \
+mpif90 \
     -o "${WRF_DIR}/main/wrf.exe" \
     -mp -O3 -fast \
     -acc -gpu="${GPU_CC},fastmath" -cuda \
@@ -353,8 +352,8 @@ nvfortran \
     "${WRF_DIR}/frame/module_internal_header_util.o" \
     "${WRF_DIR}/frame/pack_utils.o" \
     -L"${WRF_DIR}/external/io_netcdf" -lwrfio_nf \
-    -L"${WRF_DIR}/LIBRARIES/netcdf-install/lib" -lnetcdff -lnetcdf \
-    -L"${WRF_DIR}/LIBRARIES/hdf5-install/lib" \
+    -L"${NETCDF}/lib" -lnetcdff -lnetcdf \
+    -L"${HDF5}/lib" \
         -lhdf5hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5 \
     -lm -lz -ldl
 

@@ -11,10 +11,16 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
+# Prerequisites
+# ---------------------------------------------------------------------------
+echo "Checking prerequisites..."
+apt-get install -y curl build-essential m4 csh file 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
 # Versions
 # ---------------------------------------------------------------------------
 ZLIB_VERSION="1.3.1"
-HDF5_VERSION="1.14.4"          # 1.14.x series
+HDF5_VERSION="1.14.5"          # 1.14.x series
 HDF5_VERSION_SHORT="1.14"      # for mirror path
 NETCDF_C_VERSION="4.9.2"
 NETCDF_F_VERSION="4.6.1"
@@ -153,9 +159,18 @@ fetch() {
 log_step "Building zlib ${ZLIB_VERSION}"
 
 ZLIB_DIR="${BUILD_DIR}/zlib-${ZLIB_VERSION}"
-ZLIB_URL="https://zlib.net/zlib-${ZLIB_VERSION}.tar.gz"
+ZLIB_URL="https://zlib.net/fossils/zlib-${ZLIB_VERSION}.tar.gz"
+ZLIB_URL_ALT="https://github.com/madler/zlib/releases/download/v${ZLIB_VERSION}/zlib-${ZLIB_VERSION}.tar.gz"
 
-fetch "${ZLIB_URL}"
+if [[ ! -f "zlib-${ZLIB_VERSION}.tar.gz" ]]; then
+    echo "Trying primary zlib mirror..."
+    curl -fsSL -o "zlib-${ZLIB_VERSION}.tar.gz" "${ZLIB_URL}" || {
+        echo "Primary mirror failed, trying GitHub release..."
+        curl -fsSL -o "zlib-${ZLIB_VERSION}.tar.gz" "${ZLIB_URL_ALT}"
+    }
+else
+    echo "Already downloaded: zlib-${ZLIB_VERSION}.tar.gz"
+fi
 
 if [[ ! -d "${ZLIB_DIR}" ]]; then
     tar -xzf "zlib-${ZLIB_VERSION}.tar.gz"
@@ -246,6 +261,7 @@ fi
         --enable-static \
         --disable-dap \
         --disable-byterange \
+        --disable-libxml2 \
         --disable-tests \
         CC="${CC}" CFLAGS="${COMMON_CFLAGS}" \
         LDFLAGS="${LDFLAGS}" CPPFLAGS="${CPPFLAGS}" \
@@ -338,6 +354,9 @@ export CC="nvc"
 export CXX="nvc++"
 export FC="nvfortran"
 export F77="nvfortran"
+
+# NetCDF classic mode (required for WRF)
+export NETCDF_classic=1
 
 # GPU target (used in WRF configure.wrf FCFLAGS)
 export WRF_GPU_CC="${GPU_CC}"

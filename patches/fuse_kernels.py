@@ -9,6 +9,12 @@ many inner loop nests (each generating a separate CUDA kernel).
 """
 
 import re
+import os, sys
+
+WRF_DIR = os.environ.get("WRF_DIR", sys.argv[1] if len(sys.argv) > 1 else None)
+if not WRF_DIR:
+    print("ERROR: Set WRF_DIR environment variable or pass WRF directory as argument")
+    sys.exit(1)
 
 def process_file(path):
     with open(path) as f:
@@ -71,9 +77,9 @@ def process_file(path):
 
 # Process dynamics files
 files = [
-    "/home/drew/WRF_BUILD_GPU/dyn_em/module_small_step_em.f90",
-    "/home/drew/WRF_BUILD_GPU/dyn_em/module_advect_em.f90",
-    "/home/drew/WRF_BUILD_GPU/dyn_em/module_big_step_utilities_em.f90",
+    os.path.join(WRF_DIR, "dyn_em", "module_small_step_em.f90"),
+    os.path.join(WRF_DIR, "dyn_em", "module_advect_em.f90"),
+    os.path.join(WRF_DIR, "dyn_em", "module_big_step_utilities_em.f90"),
 ]
 
 total = 0

@@ -14,12 +14,17 @@ Safe to run multiple times — skips fields already registered.
 
 Usage:
     python patch_gpu_init_les.py [WRF_DIR]
-    # default: /home/drew/WRF_BUILD_GPU
+    # default: reads from WRF_DIR env var
 """
 import sys
 import re
+import os
 
-WRF = sys.argv[1] if len(sys.argv) > 1 else "/home/drew/WRF_BUILD_GPU"
+WRF_DIR = os.environ.get("WRF_DIR", sys.argv[1] if len(sys.argv) > 1 else None)
+if not WRF_DIR:
+    print("ERROR: Set WRF_DIR environment variable or pass WRF directory as argument")
+    sys.exit(1)
+WRF = WRF_DIR
 ACC = "!" + "$" + "acc"
 
 # Fields to add, grouped by purpose. All are "create" (computed on device).

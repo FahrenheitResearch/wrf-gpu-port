@@ -37,7 +37,12 @@ import sys
 import shutil
 import os
 
-INPUT_FILE = "/home/drew/WRF_BUILD_GPU/dyn_em/module_advect_em.f90"
+WRF_DIR = os.environ.get("WRF_DIR", sys.argv[1] if len(sys.argv) > 1 else None)
+if not WRF_DIR:
+    print("ERROR: Set WRF_DIR environment variable or pass WRF directory as argument")
+    sys.exit(1)
+
+INPUT_FILE = os.path.join(WRF_DIR, "dyn_em", "module_advect_em.f90")
 BACKUP_FILE = INPUT_FILE + ".bak_before_horz_acc"
 
 

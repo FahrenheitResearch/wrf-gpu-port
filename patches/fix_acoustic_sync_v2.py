@@ -28,8 +28,14 @@ The acoustic loop structure for specified BCs (non-polar) is:
   [Sync B: GPU->CPU for state] (already exists)
 """
 import re
+import os, sys
 
-filepath = "/home/drew/WRF_BUILD_GPU/dyn_em/solve_em.F"
+WRF_DIR = os.environ.get("WRF_DIR", sys.argv[1] if len(sys.argv) > 1 else None)
+if not WRF_DIR:
+    print("ERROR: Set WRF_DIR environment variable or pass WRF directory as argument")
+    sys.exit(1)
+
+filepath = os.path.join(WRF_DIR, "dyn_em", "solve_em.F")
 
 with open(filepath, 'r') as f:
     lines = f.readlines()

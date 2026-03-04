@@ -821,9 +821,14 @@ def patch_file(filepath):
 
 
 if __name__ == "__main__":
-    filepath = "/home/drew/WRF_BUILD_GPU/dyn_em/module_big_step_utilities_em.f90"
+    WRF_DIR = os.environ.get("WRF_DIR", None)
     if len(sys.argv) > 1:
         filepath = sys.argv[1]
+    elif WRF_DIR:
+        filepath = os.path.join(WRF_DIR, "dyn_em", "module_big_step_utilities_em.f90")
+    else:
+        print("ERROR: Set WRF_DIR environment variable or pass file path as argument")
+        sys.exit(1)
 
     if not os.path.exists(filepath):
         print(f"ERROR: File not found: {filepath}")

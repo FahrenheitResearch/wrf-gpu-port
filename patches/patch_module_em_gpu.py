@@ -3,7 +3,7 @@
 Patch module_em.f90 (preprocessed) to add OpenACC directives to loop nests
 in the RK loop orchestrator routines.
 
-Operates on: /home/drew/WRF_BUILD_GPU/dyn_em/module_em.f90
+Operates on: $WRF_DIR/dyn_em/module_em.f90
 
 === PORTED (new !$acc parallel loop directives) ===
   - rk_addtend_dry: 5 loop nests (ru_tend, rv_tend, rw_tend+ph_tend, t_tend, mu_tend)
@@ -1188,8 +1188,14 @@ def patch_file(filepath):
 
 
 if __name__ == "__main__":
-    default_path = "/home/drew/WRF_BUILD_GPU/dyn_em/module_em.f90"
-    filepath = sys.argv[1] if len(sys.argv) > 1 else default_path
+    WRF_DIR = os.environ.get("WRF_DIR", None)
+    if len(sys.argv) > 1:
+        filepath = sys.argv[1]
+    elif WRF_DIR:
+        filepath = os.path.join(WRF_DIR, "dyn_em", "module_em.f90")
+    else:
+        print("ERROR: Set WRF_DIR environment variable or pass file path as argument")
+        sys.exit(1)
 
     if not os.path.exists(filepath):
         print(f"ERROR: {filepath} not found")

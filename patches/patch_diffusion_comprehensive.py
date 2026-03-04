@@ -40,8 +40,14 @@ Date: 2026-03-03
 
 import re
 import sys
+import os
 
-TARGET = "/home/drew/WRF_BUILD_GPU/dyn_em/module_diffusion_em.f90"
+WRF_DIR = os.environ.get("WRF_DIR", sys.argv[1] if len(sys.argv) > 1 else None)
+if not WRF_DIR:
+    print("ERROR: Set WRF_DIR environment variable or pass WRF directory as argument")
+    sys.exit(1)
+
+TARGET = os.path.join(WRF_DIR, "dyn_em", "module_diffusion_em.f90")
 
 # Each entry: (sub_name, anchor_pattern, [local_array_names])
 # anchor_pattern: whitespace-insensitive match for the first executable statement.
