@@ -25,9 +25,10 @@ echo "reference local variables without proper data regions. Strip them so"
 echo "our patches can add properly-scoped ACC with !\\$acc data create(...)."
 echo ""
 
-# Strip native ACC from sfclayrev (physics — present() errors on subroutine args)
+# Strip native ACC from sfclayrev — both .F sources AND .f90 generated files
+# Must strip .F so recompiles don't regenerate broken ACC into .f90
 SFCLAY_COUNT=0
-for f in $(find "$WRF/phys" -name "*sfclayrev*" -type f 2>/dev/null); do
+for f in $(find "$WRF/phys" -name "*sfclayrev*" \( -name "*.F" -o -name "*.F90" -o -name "*.f90" \) -type f 2>/dev/null); do
     n=$(grep -c '!\$acc' "$f" 2>/dev/null || true)
     if [ "$n" -gt 0 ]; then
         sed -i 's/^\([[:space:]]*\)!\$acc/\1!DISABLED_acc/' "$f"
@@ -36,12 +37,20 @@ for f in $(find "$WRF/phys" -name "*sfclayrev*" -type f 2>/dev/null); do
     fi
 done
 
-# Strip native ACC from solve_em.f90 (locals like ph_save referenced without data create)
-SOLVE_COUNT=$(grep -c '!\$acc' "$WRF/dyn_em/solve_em.f90" 2>/dev/null || true)
-if [ "$SOLVE_COUNT" -gt 0 ]; then
-    sed -i 's/^\([[:space:]]*\)!\$acc/\1!DISABLED_acc/' "$WRF/dyn_em/solve_em.f90"
-    echo "  Stripped $SOLVE_COUNT native ACC directives from solve_em.f90"
-fi
+# Strip native ACC from solve_em — BOTH .F and .f90
+# solve_em.F has 9+ unconditional !$acc update directives that aren't behind #ifdef
+# If we only strip .f90, recompile regenerates broken ACC from .F
+SOLVE_COUNT=0
+for f in "$WRF/dyn_em/solve_em.F" "$WRF/dyn_em/solve_em.f90"; do
+    if [ -f "$f" ]; then
+        n=$(grep -c '!\$acc' "$f" 2>/dev/null || true)
+        if [ "$n" -gt 0 ]; then
+            sed -i 's/^\([[:space:]]*\)!\$acc/\1!DISABLED_acc/' "$f"
+            echo "  Stripped $n native ACC directives from $(basename $f)"
+            SOLVE_COUNT=$((SOLVE_COUNT + n))
+        fi
+    fi
+done
 
 echo "  Total stripped: $((SFCLAY_COUNT + SOLVE_COUNT)) native ACC directives"
 echo "  Our patches will re-add properly-scoped ACC directives."
