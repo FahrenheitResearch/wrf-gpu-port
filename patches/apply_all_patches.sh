@@ -1,0 +1,138 @@
+#!/bin/bash
+# Apply all safe GPU patches to freshly-built .f90 files.
+# Usage: WRF_DIR=/path/to/WRF ./apply_all_patches.sh
+#
+# DOES NOT apply patch_wsm6_gpu.py (modified code logic → NaN)
+# DOES NOT apply patch_ysu_gpu.py (caused GPU hang)
+# Disables advect ACC by default (causes instability at ~5 min)
+# Disables module_bc ACC by default (present() errors)
+set -e
+
+WRF="${WRF_DIR:-/home/$USER/WRF_BUILD_GPU}"
+PATCHES="$(cd "$(dirname "$0")" && pwd)"
+PYTHON="${PYTHON:-python3}"
+
+echo "WRF_DIR: $WRF"
+echo "PATCHES: $PATCHES"
+echo ""
+
+echo "============================================"
+echo "STEP 1: Verify .f90 files exist"
+echo "============================================"
+for f in $WRF/dyn_em/module_small_step_em.f90 \
+         $WRF/dyn_em/module_advect_em.f90 \
+         $WRF/dyn_em/module_big_step_utilities_em.f90 \
+         $WRF/dyn_em/module_diffusion_em.f90 \
+         $WRF/dyn_em/solve_em.f90 \
+         $WRF/dyn_em/module_em.f90 \
+         $WRF/frame/module_domain.f90 \
+         $WRF/share/module_bc.f90; do
+    if [ ! -f "$f" ]; then
+        echo "MISSING: $f"
+        echo "Run './compile em_real' first to generate .f90 files from .F sources."
+        exit 1
+    fi
+done
+echo "All .f90 files present."
+
+echo ""
+echo "============================================"
+echo "STEP 2: Apply GPU init patch (1404 grid% arrays)"
+echo "============================================"
+$PYTHON $PATCHES/build_gpu_init_from_struct.py
+$PYTHON $PATCHES/patch_gpu_init_les.py
+echo "gpu_init patched"
+
+echo ""
+echo "============================================"
+echo "STEP 3: Apply dynamics patches"
+echo "============================================"
+
+echo "Patching small_step_em..."
+$PYTHON $PATCHES/patch_small_step_gpu.py
+echo "  done"
+
+echo "Patching advect_em..."
+$PYTHON $PATCHES/patch_advect_gpu.py
+$PYTHON $PATCHES/patch_advect_locals.py
+$PYTHON $PATCHES/fix_advect_w_create.py
+echo "  done"
+
+echo "Patching big_step_utilities..."
+$PYTHON $PATCHES/patch_big_step_gpu.py
+$PYTHON $PATCHES/patch_remaining_bigstep_gpu.py
+echo "  done"
+
+echo "Patching diffusion (comprehensive)..."
+$PYTHON $PATCHES/patch_diffusion_comprehensive.py
+echo "  done"
+
+echo ""
+echo "============================================"
+echo "STEP 3b: Infrastructure patches"
+echo "============================================"
+
+echo "Patching module_bc..."
+$PYTHON $PATCHES/patch_bc_gpu.py
+echo "  done"
+
+echo "Patching module_em..."
+$PYTHON $PATCHES/patch_module_em_gpu.py
+echo "  done"
+
+echo "Patching first_rk + physics_addtendc..."
+$PYTHON $PATCHES/patch_first_rk_gpu.py || echo "  (skipped - file may not exist)"
+$PYTHON $PATCHES/fix_addtendc.py || echo "  (skipped - file may not exist)"
+echo "  done"
+
+echo "Patching solve_em data regions..."
+$PYTHON $PATCHES/patch_solve_em_gpu.py
+echo "  done"
+
+echo ""
+echo "============================================"
+echo "STEP 4: Apply physics patches (SAFE ONLY)"
+echo "============================================"
+
+echo "Patching sfclayrev..."
+$PYTHON $PATCHES/patch_sfclay_gpu.py
+echo "  done"
+
+echo "SKIPPING patch_wsm6_gpu.py (caused NaN — modified code logic)"
+echo "SKIPPING patch_ysu_gpu.py (caused GPU hang)"
+
+echo ""
+echo "============================================"
+echo "STEP 4b: Kernel fusion (must be after dynamics patches)"
+echo "============================================"
+$PYTHON $PATCHES/fuse_kernels.py
+$PYTHON $PATCHES/patch_fuse_advect_kernels.py
+echo "  done"
+
+echo ""
+echo "============================================"
+echo "STEP 5: Apply timing fix for GPU init"
+echo "============================================"
+$PYTHON $PATCHES/fix_gpu_init_timing.py || echo "  (skipped - may target .F file)"
+$PYTHON $PATCHES/fix_acoustic_sync_v2.py || echo "  (skipped - may target .F file)"
+echo "  done"
+
+echo ""
+echo "============================================"
+echo "STEP 6: Disable known-broken ACC modules"
+echo "============================================"
+
+echo "Disabling advect ACC (causes instability at ~5 min)..."
+$PYTHON $PATCHES/disable_one_acc.py module_advect_em.f90
+echo "  done"
+
+echo "Disabling module_bc ACC (present() errors)..."
+$PYTHON $PATCHES/disable_bc_acc.py
+echo "  done"
+
+echo ""
+echo "============================================"
+echo "ALL PATCHES APPLIED"
+echo "============================================"
+echo ""
+echo "Now run compile_patched.sh to rebuild patched modules and relink wrf.exe"
