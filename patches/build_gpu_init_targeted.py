@@ -55,6 +55,10 @@ DYNAMICS_CORE = [
     "h_diabatic", "mut",
     # Scalars
     "qv_diabatic", "qc_diabatic",
+    # Save arrays (used by rk_addtend_dry in module_em)
+    "u_save", "v_save", "t_save",
+    # Additional coupled velocity
+    "muu", "muv",
 ]
 
 # Physics tendency arrays (used by calculate_phy_tend in module_em)
