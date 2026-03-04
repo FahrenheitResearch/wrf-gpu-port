@@ -189,15 +189,24 @@ def main():
 
 
 def _build_copyin_block():
-    """Build Fortran copyin statements with ASSOCIATED() guards."""
+    """Build Fortran copyin statements.
+
+    Uses !$acc enter data copyin() directly without ASSOCIATED() guards.
+    All grid arrays in our targeted list are guaranteed to be allocated
+    for em_real by the time gpu_init_domain_data is called from solve_em.
+    ASSOCIATED() only works for POINTER arrays but many grid members
+    (ru, rv, rw, ww, etc.) are ALLOCATABLE, causing compile errors.
+    """
     lines = []
     lines.append("    ! --- Targeted GPU data init (dynamics + physics coupling) ---")
 
-    # Group into chunks for readability
-    for arr in ALL_ARRAYS:
-        lines.append(f"    IF (ASSOCIATED(grid%{arr})) THEN")
-        lines.append(f"      !$acc enter data copyin(grid%{arr})")
-        lines.append(f"    END IF")
+    # Batch copyin for efficiency — group into multi-array directives
+    # Each directive can have up to ~6 arrays per continuation line
+    chunk_size = 4
+    for start in range(0, len(ALL_ARRAYS), chunk_size):
+        chunk = ALL_ARRAYS[start:start + chunk_size]
+        arr_list = ", ".join(f"grid%{arr}" for arr in chunk)
+        lines.append(f"    !$acc enter data copyin({arr_list})")
 
     return "\n".join(lines)
 
