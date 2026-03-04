@@ -18,9 +18,40 @@ echo "PATCHES: $PATCHES"
 echo ""
 
 echo "============================================"
+echo "PRE-STEP 0: Strip WRF native ACC directives"
+echo "============================================"
+echo "WRF 4.7.1 has built-in !\\$acc directives (via #ifdef GPU_OPENACC) that"
+echo "reference local variables without proper data regions. Strip them so"
+echo "our patches can add properly-scoped ACC with !\\$acc data create(...)."
+echo ""
+
+# Strip native ACC from sfclayrev (physics — present() errors on subroutine args)
+SFCLAY_COUNT=0
+for f in $(find "$WRF/phys" -name "*sfclayrev*" -type f 2>/dev/null); do
+    n=$(grep -c '!\$acc' "$f" 2>/dev/null || true)
+    if [ "$n" -gt 0 ]; then
+        sed -i 's/^\([[:space:]]*\)!\$acc/\1!DISABLED_acc/' "$f"
+        echo "  Stripped $n native ACC directives from $(basename $f)"
+        SFCLAY_COUNT=$((SFCLAY_COUNT + n))
+    fi
+done
+
+# Strip native ACC from solve_em.f90 (locals like ph_save referenced without data create)
+SOLVE_COUNT=$(grep -c '!\$acc' "$WRF/dyn_em/solve_em.f90" 2>/dev/null || true)
+if [ "$SOLVE_COUNT" -gt 0 ]; then
+    sed -i 's/^\([[:space:]]*\)!\$acc/\1!DISABLED_acc/' "$WRF/dyn_em/solve_em.f90"
+    echo "  Stripped $SOLVE_COUNT native ACC directives from solve_em.f90"
+fi
+
+echo "  Total stripped: $((SFCLAY_COUNT + SOLVE_COUNT)) native ACC directives"
+echo "  Our patches will re-add properly-scoped ACC directives."
+echo ""
+
+echo "============================================"
 echo "PRE-CHECK: Detect already-patched .f90 files"
 echo "============================================"
-ACC_COUNT=$(grep -rl '!\$acc' "$WRF"/dyn_em/*.f90 "$WRF"/frame/module_domain.f90 "$WRF"/share/module_bc.f90 2>/dev/null | wc -l || true)
+# Check for our custom patches (not the native ones we just stripped)
+ACC_COUNT=$(grep -rl '!\$acc' "$WRF"/dyn_em/module_small_step_em.f90 "$WRF"/dyn_em/module_big_step_utilities_em.f90 "$WRF"/dyn_em/module_diffusion_em.f90 "$WRF"/frame/module_domain.f90 2>/dev/null | wc -l || true)
 if [ "$ACC_COUNT" -gt 0 ]; then
     echo "WARNING: $ACC_COUNT .f90 file(s) already contain !\$acc directives."
     echo "  Patches are designed to run on clean (unpatched) .f90 files."
@@ -122,8 +153,8 @@ echo ""
 echo "============================================"
 echo "STEP 4b: Kernel fusion (must be after dynamics patches)"
 echo "============================================"
-$PYTHON $PATCHES/fuse_kernels.py
-$PYTHON $PATCHES/patch_fuse_advect_kernels.py
+$PYTHON $PATCHES/fuse_kernels.py || echo "  (skipped - kernel fusion optional)"
+$PYTHON $PATCHES/patch_fuse_advect_kernels.py || echo "  (skipped - advect fusion optional)"
 echo "  done"
 
 echo ""
